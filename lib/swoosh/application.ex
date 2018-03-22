@@ -8,6 +8,7 @@ defmodule Swoosh.Application do
 
     children = [
       worker(Swoosh.Adapters.Local.Storage.Memory, []),
+      supervisor(Task.Supervisor, [[name: Swoosh.TaskSupervisor]]),
     ]
 
     children =

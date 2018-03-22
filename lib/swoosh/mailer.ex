@@ -86,6 +86,22 @@ defmodule Swoosh.Mailer do
           {:error, reason} -> raise DeliveryError, reason: reason
         end
       end
+
+      @spec deliver_later(Swoosh.Email.t, Keyword.t) :: {:ok, term} | {:error, term}
+      def deliver_later(email, config \\ [])
+      def deliver_later(email, config) do
+        config = Mailer.parse_config(@otp_app, __MODULE__, @mailer_config, config)
+        Mailer.deliver_later(email, config)
+      end
+
+      @spec deliver_later!(Swoosh.Email.t, Keyword.t) :: term | no_return
+      def deliver_later!(email, config \\ [])
+      def deliver_later!(email, config) do
+        case deliver_later(email, config) do
+          {:ok, pid} -> pid
+          {:error, reason} -> raise DeliveryError, reason: reason
+        end
+      end
     end
   end
 
@@ -101,6 +117,20 @@ defmodule Swoosh.Mailer do
 
     :ok = adapter.validate_config(config)
     adapter.deliver(email, config)
+  end
+
+  def deliver_later(%Swoosh.Email{from: nil}, _config) do
+    {:error, :from_not_set}
+  end
+  def deliver_later(%Swoosh.Email{from: {_name, address}}, _config)
+      when address in ["", nil] do
+    {:error, :from_not_set}
+  end
+  def deliver_later(%Swoosh.Email{} = email, config) do
+    adapter = Keyword.fetch!(config, :adapter)
+
+    :ok = adapter.validate_config(config)
+    Task.Supervisor.start_child(Swoosh.TaskSupervisor, adapter, :deliver, [email, config])
   end
 
   @doc """
